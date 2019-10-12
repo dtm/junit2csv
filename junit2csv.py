@@ -9,7 +9,7 @@ import getopt
 
 import xmltodict
 
-def parse_junit(unit, prefix):
+def parse_junit(unit, prefix, timings=False):
     test = {}
     test_cases = unit['testsuite']['testcase']
     test_states = {}
@@ -20,8 +20,12 @@ def parse_junit(unit, prefix):
         name = x[u'@name']
         if 'skipped' in x:
             continue
-        passed = 'failure' not in x
-        test_states[(prefix, classname, name)] = passed
+        value = None
+        if timings:
+            value = x['@time']
+        else:
+            value = 'failure' not in x
+        test_states[(prefix, classname, name)] = value
 
     return test_states
 
@@ -37,14 +41,14 @@ def merge_junit(a, b):
 def test_key_to_header(x):
     return x[0]+'/'+x[1]+'/'+x[2]
 
-def run(ignore=[]):
+def run(ignore=[], timings=False):
     junits = OrderedDict()
 
     for filepath in sys.stdin.read().splitlines():
         with open(filepath) as fd:
             try:
                 (path, filename) = os.path.split(filepath)
-                junits[filepath] = parse_junit(xmltodict.parse(fd), filename)
+                junits[filepath] = parse_junit(xmltodict.parse(fd), filename, timings=timings)
             except Exception as e:
                 print("parse error:", filepath, e, file=sys.stderr)
 
@@ -68,29 +72,37 @@ def run(ignore=[]):
     writer.writerow(header)
 
     for (f, t) in junits.iteritems():
+        def to_output(x):
+            if isinstance(x, bool):
+                return 1 if x else 0
+            return x
         row = [f]
-        row.extend([1 if t.get(x, False) else 0 for x in testnames])
+        row.extend(map(to_output, [t.get(x, False) for x in testnames]))
         writer.writerow(row)
 
 def usage():
     print("Usage: %s [OPTION]..." % (sys.argv[0]))
     print("")
+    print("-t, --timings            Extract timings instead of passes/failures")
     print("-x, --exclude=testname   Exclude a test from the output")
     print("")
 
 if __name__ == "__main__":
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "hx:", ["help" "exclude="])
+        optlist, args = getopt.getopt(sys.argv[1:], "hx:t", ["help", "exclude=", "timings"])
     except getopt.GetoptError as err:
         usage()
         sys.exit(2)
 
     ignores = []
+    timings = False
     for o, a in optlist:
         if o in ("-h", "--help"):
             usage()
             sys.exit()
+        elif o in ("-t", "--timings"):
+            timings = True
         elif o in ("-x", "--exclude"):
             ignores.append(a)
 
-    run(ignore=ignores)
+    run(ignore=ignores, timings=timings)
