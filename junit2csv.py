@@ -31,10 +31,10 @@ def parse_junit(unit, prefix, timings=False):
 
 def merge_junit(a, b):
     merged = {}
-    for (k, v) in a.iteritems():
+    for (k, v) in a.items():
         merged[k] = a.get(k, False) or b.get(k, False)
 
-    for (k, v) in b.iteritems():
+    for (k, v) in b.items():
         merged[k] = a.get(k, False) or b.get(k, False)
     return merged
 
@@ -45,7 +45,7 @@ def run(ignore=[], timings=False):
     junits = OrderedDict()
 
     for filepath in sys.stdin.read().splitlines():
-        with open(filepath) as fd:
+        with open(filepath, "rb") as fd:
             try:
                 (path, filename) = os.path.split(filepath)
                 junits[filepath] = parse_junit(xmltodict.parse(fd), filename, timings=timings)
@@ -71,7 +71,7 @@ def run(ignore=[], timings=False):
     header.extend([test_key_to_header(x) for x in testnames])
     writer.writerow(header)
 
-    for (f, t) in junits.iteritems():
+    for (f, t) in junits.items():
         def to_output(x):
             if isinstance(x, bool):
                 return 1 if x else 0
